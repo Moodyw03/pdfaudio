@@ -7,8 +7,22 @@ from googletrans import Translator
 import threading
 import uuid
 import time
+from pathlib import Path
+import logging
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def ensure_directories():
+    directories = ['uploads', 'output', 'temp']
+    for directory in directories:
+        Path(directory).mkdir(parents=True, exist_ok=True)
+
+# Call ensure_directories after defining it
+ensure_directories()
 
 # Global dictionary to store progress information
 progress_dict = {}
@@ -91,6 +105,7 @@ def concatenate_audio_files(audio_files, output_path):
 
 def process_pdf(filename, file_path, language_code, tld, speed, task_id):
     try:
+        logger.info(f"Starting processing for task {task_id}")
         if not os.path.exists('output'):
             os.makedirs('output')
         if not os.path.exists('temp'):
@@ -180,6 +195,7 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id):
         progress_dict[task_id]['file'] = final_audio_file
 
     except Exception as e:
+        logger.error(f"Error in process_pdf: {str(e)}")
         progress_dict[task_id]['status'] = 'Error'
         progress_dict[task_id]['error'] = str(e)
 
@@ -189,9 +205,43 @@ def index():
 
 @app.route("/", methods=["POST"])
 def process_file():
-    if "pdf_file" not in request.files:
-        return jsonify({"error": "No file part in the request"}), 400
-    # ... rest of your existing POST handling code ...
+    try:
+        if "pdf_file" not in request.files:
+            return jsonify({"error": "No file part in the request"}), 400
+            
+        file = request.files["pdf_file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+            
+        if file and file.filename.endswith(".pdf"):
+            # Create a unique task ID
+            task_id = str(uuid.uuid4())
+            
+            # Save the uploaded file
+            filename = file.filename
+            file_path = os.path.join('uploads', f"{task_id}_{filename}")
+            file.save(file_path)
+            
+            # Get voice settings
+            voice = request.form.get("voice", "en")
+            speed = float(request.form.get("speed", "1.0"))
+            
+            # Get language settings from the mapping
+            lang_settings = language_map.get(voice, {"lang": "en", "tld": "com"})
+            
+            # Start processing in a background thread
+            thread = threading.Thread(
+                target=process_pdf,
+                args=(filename, file_path, lang_settings["lang"], lang_settings["tld"], speed, task_id)
+            )
+            thread.start()
+            
+            return jsonify({"task_id": task_id}), 202
+            
+        return jsonify({"error": "Invalid file type"}), 400
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/progress/<task_id>')
 def progress(task_id):
