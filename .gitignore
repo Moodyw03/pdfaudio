@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
+*.pyc
 
 # Virtual environment
 venv/
@@ -19,3 +19,6 @@ temp/
 
 # MacOS system files
 .DS_Store
+
+# Environment variables
+.env

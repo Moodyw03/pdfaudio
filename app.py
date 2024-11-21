@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 def ensure_directories():
     directories = ['uploads', 'output', 'temp']
     for directory in directories:
-        Path(directory).mkdir(parents=True, exist_ok=True)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
 # Call ensure_directories after defining it
 ensure_directories()

@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: docspeak
+    name: docecho
     env: python
     buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
       pip install -r requirements.txt
+      apt-get update && apt-get install -y ffmpeg
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
