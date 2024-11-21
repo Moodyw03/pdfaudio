@@ -9,6 +9,9 @@ import uuid
 import time
 from pathlib import Path
 import logging
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -103,7 +106,40 @@ def concatenate_audio_files(audio_files, output_path):
     except Exception as e:
         raise Exception(f"Error concatenating audio files: {e}")
 
-def process_pdf(filename, file_path, language_code, tld, speed, task_id):
+def create_translated_pdf(text, output_path):
+    try:
+        c = canvas.Canvas(output_path, pagesize=letter)
+        width, height = letter
+        y = height - 50  # Start from top
+        
+        # Split text into lines
+        words = text.split()
+        line = []
+        for word in words:
+            line.append(word)
+            # Check if line width exceeds page width
+            if c.stringWidth(' '.join(line), 'Helvetica', 12) > width - 100:
+                line.pop()  # Remove last word
+                # Draw the line
+                c.drawString(50, y, ' '.join(line))
+                y -= 20  # Move down
+                line = [word]  # Start new line with the word that didn't fit
+                
+            # Create new page if needed
+            if y < 50:
+                c.showPage()
+                y = height - 50
+        
+        # Draw any remaining text
+        if line:
+            c.drawString(50, y, ' '.join(line))
+        
+        c.save()
+        return output_path
+    except Exception as e:
+        raise Exception(f"Error creating PDF: {e}")
+
+def process_pdf(filename, file_path, language_code, tld, speed, task_id, output_format="audio"):
     try:
         logger.info(f"Starting processing for task {task_id}")
         if not os.path.exists('output'):
@@ -128,6 +164,7 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id):
         # Process chunks in smaller batches
         batch_size = 10
         audio_chunks = []
+        translated_text = []  # Store all translated text
         
         for batch_start in range(0, total_chunks, batch_size):
             batch_end = min(batch_start + batch_size, total_chunks)
@@ -139,45 +176,43 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id):
                 progress_dict[task_id]['status'] = f'Processing chunk {batch_start + i + 1} of {total_chunks}...'
 
                 try:
-                    # Translate the chunk with retry mechanism
-                    max_retries = 3
-                    for attempt in range(max_retries):
-                        try:
-                            translated_chunk = translator.translate(chunk, dest=language_code).text
-                            break
-                        except Exception as e:
-                            if attempt == max_retries - 1:
-                                raise e
-                            time.sleep(1)  # Wait before retrying
-
-                    # Convert the translated chunk to audio
-                    chunk_filename = f"{task_id}_chunk_{batch_start + i}.mp3"
-                    audio_chunk_path = convert_text_to_audio(
-                        translated_chunk,
-                        chunk_filename,
-                        language_code,
-                        speed,
-                        tld,
-                    )
-                    audio_chunks.append(audio_chunk_path)
+                    translated_chunk = translator.translate(chunk, dest=language_code).text
+                    translated_text.append(translated_chunk)  # Store translated text
+                    
+                    if output_format in ["audio", "both"]:
+                        # Convert the translated chunk to audio
+                        chunk_filename = f"{task_id}_chunk_{batch_start + i}.mp3"
+                        audio_chunk_path = convert_text_to_audio(
+                            translated_chunk,
+                            chunk_filename,
+                            language_code,
+                            speed,
+                            tld,
+                        )
+                        audio_chunks.append(audio_chunk_path)
 
                 except Exception as e:
-                    # Log the error but continue processing
-                    print(f"Error processing chunk {batch_start + i}: {str(e)}")
+                    logger.error(f"Error processing chunk {batch_start + i}: {str(e)}")
                     continue
 
             # Free up memory after each batch
             import gc
             gc.collect()
 
-        if not audio_chunks:
-            raise Exception("No audio chunks were successfully created")
+        # Handle PDF creation if requested
+        if output_format in ["pdf", "both"]:
+            pdf_filename = filename.replace(".pdf", f"_translated_{task_id}.pdf")
+            pdf_path = os.path.join("output", pdf_filename)
+            create_translated_pdf('\n'.join(translated_text), pdf_path)
+            progress_dict[task_id]['pdf_file'] = pdf_path
 
-        # Concatenate all audio chunks into a final audio file
-        progress_dict[task_id]['status'] = 'Combining audio chunks...'
-        output_filename = filename.replace(".pdf", f"_{task_id}.mp3")
-        final_audio_file = os.path.join("output", output_filename)
-        concatenate_audio_files(audio_chunks, final_audio_file)
+        # Handle audio if requested
+        if output_format in ["audio", "both"]:
+            if audio_chunks:
+                output_filename = filename.replace(".pdf", f"_{task_id}.mp3")
+                final_audio_file = os.path.join("output", output_filename)
+                concatenate_audio_files(audio_chunks, final_audio_file)
+                progress_dict[task_id]['audio_file'] = final_audio_file
 
         # Clean up
         for audio_file in audio_chunks:
@@ -192,7 +227,6 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id):
 
         progress_dict[task_id]['progress'] = 100
         progress_dict[task_id]['status'] = 'Completed'
-        progress_dict[task_id]['file'] = final_audio_file
 
     except Exception as e:
         logger.error(f"Error in process_pdf: {str(e)}")
@@ -229,10 +263,14 @@ def process_file():
             # Get language settings from the mapping
             lang_settings = language_map.get(voice, {"lang": "en", "tld": "com"})
             
+            # Get output format
+            output_format = request.form.get("output_format", "audio")
+            
             # Start processing in a background thread
             thread = threading.Thread(
                 target=process_pdf,
-                args=(filename, file_path, lang_settings["lang"], lang_settings["tld"], speed, task_id)
+                args=(filename, file_path, lang_settings["lang"], 
+                      lang_settings["tld"], speed, task_id, output_format)
             )
             thread.start()
             
@@ -254,8 +292,15 @@ def progress(task_id):
 def download(task_id):
     if task_id in progress_dict:
         if progress_dict[task_id]['status'] == 'Completed':
-            file_path = progress_dict[task_id]['file']
-            return send_file(file_path, as_attachment=True)
+            output_format = request.args.get('format', 'audio')
+            
+            if output_format == 'pdf' and 'pdf_file' in progress_dict[task_id]:
+                return send_file(progress_dict[task_id]['pdf_file'], as_attachment=True)
+            elif output_format == 'audio' and 'audio_file' in progress_dict[task_id]:
+                return send_file(progress_dict[task_id]['audio_file'], as_attachment=True)
+            else:
+                return jsonify({'error': 'Requested format not available'}), 400
+                
         elif progress_dict[task_id]['status'] == 'Error':
             return jsonify({'error': progress_dict[task_id]['error']}), 500
         else:
