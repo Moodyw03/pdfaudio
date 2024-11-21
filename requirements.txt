@@ -4,4 +4,5 @@ gTTS==2.5.3
 PyPDF2==3.0.1
 pydub==0.25.1
 gunicorn==21.2.0
+reportlab==4.0.4
 
