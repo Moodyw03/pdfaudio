@@ -429,6 +429,9 @@
           <option value="es">Spanish</option>
           <option value="fr">French</option>
           <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="zh-CN">Chinese (Mandarin)</option>
+          <option value="ja">Japanese</option>
         </select>
       </div>
 
@@ -568,6 +571,33 @@
 
     // Call updateButtonText on page load
     updateButtonText();
+
+    // Add this function to handle language-based restrictions
+    function updateOutputOptions() {
+        const selectedVoice = document.getElementById("voice").value;
+        const outputFormat = document.getElementById("output_format");
+        const asianLanguages = ['ja', 'zh-CN'];
+        
+        if (asianLanguages.includes(selectedVoice)) {
+            // For Japanese and Chinese, restrict to audio only
+            outputFormat.value = 'audio';
+            outputFormat.disabled = true;
+            // Add a note about the restriction
+            document.getElementById("formatNote").style.display = "block";
+        } else {
+            // For other languages, enable all options
+            outputFormat.disabled = false;
+            document.getElementById("formatNote").style.display = "none";
+        }
+        
+        updateButtonText();
+    }
+
+    // Add this after your existing voice select element
+    document.getElementById("voice").addEventListener("change", updateOutputOptions);
+
+    // Call on page load
+    document.addEventListener("DOMContentLoaded", updateOutputOptions);
   </script>
 </body>
 </html>

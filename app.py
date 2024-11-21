@@ -12,6 +12,10 @@ import logging
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from io import BytesIO
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
+from textwrap import wrap
 
 app = Flask(__name__)
 
@@ -37,8 +41,11 @@ language_map = {
     "en-uk": {"lang": "en", "tld": "co.uk"},
     "pt": {"lang": "pt", "tld": "com.br"},
     "es": {"lang": "es", "tld": "com"},
-    "fr": {"lang": "fr", "tld": "com"},
-    "de": {"lang": "de", "tld": "com"},
+    "fr": {"lang": "fr", "tld": "fr"},
+    "de": {"lang": "de", "tld": "de"},
+    "it": {"lang": "it", "tld": "it"},
+    "zh-CN": {"lang": "zh-CN", "tld": "com"},
+    "ja": {"lang": "ja", "tld": "co.jp"}
 }
 
 def extract_text_chunks_from_pdf(pdf_path, max_chunk_length=500):
@@ -107,38 +114,58 @@ def concatenate_audio_files(audio_files, output_path):
     except Exception as e:
         raise Exception(f"Error concatenating audio files: {e}")
 
-def create_translated_pdf(text, output_path):
+def register_fonts():
+    font_dir = os.path.join(os.path.dirname(__file__), 'fonts')
+    pdfmetrics.registerFont(TTFont('NotoSans', os.path.join(font_dir, 'NotoSans-Regular.ttf')))
+    pdfmetrics.registerFont(TTFont('NotoSansJP', os.path.join(font_dir, 'NotoSansJP-Regular.otf')))
+    addMapping('NotoSans', 0, 0, 'NotoSans')
+    addMapping('NotoSansJP', 0, 0, 'NotoSansJP')
+
+def create_translated_pdf(text, output_path, language_code='en'):
     try:
         c = canvas.Canvas(output_path, pagesize=letter)
         width, height = letter
         y = height - 50  # Start from top
         
-        # Split text into lines
-        words = text.split()
-        line = []
-        for word in words:
-            line.append(word)
-            # Check if line width exceeds page width
-            if c.stringWidth(' '.join(line), 'Helvetica', 12) > width - 100:
-                line.pop()  # Remove last word
-                # Draw the line
-                c.drawString(50, y, ' '.join(line))
-                y -= 20  # Move down
-                line = [word]  # Start new line with the word that didn't fit
-                
-            # Create new page if needed
-            if y < 50:
-                c.showPage()
-                y = height - 50
+        # Use default Helvetica font
+        c.setFont("Helvetica", 11)
         
-        # Draw any remaining text
-        if line:
-            c.drawString(50, y, ' '.join(line))
+        # Split text into lines for better handling
+        lines = text.split('\n')
+        for line in lines:
+            # Basic word wrapping
+            words = line.split()
+            current_line = []
+            
+            for word in words:
+                current_line.append(word)
+                line_width = c.stringWidth(' '.join(current_line), "Helvetica", 11)
+                
+                if line_width > width - 100:
+                    # Remove last word and print line
+                    current_line.pop()
+                    if current_line:
+                        c.drawString(50, y, ' '.join(current_line))
+                        y -= 20
+                    current_line = [word]
+                
+                # Check if we need a new page
+                if y < 50:
+                    c.showPage()
+                    c.setFont("Helvetica", 11)
+                    y = height - 50
+            
+            # Print remaining words in the line
+            if current_line:
+                c.drawString(50, y, ' '.join(current_line))
+                y -= 20
         
         c.save()
         return output_path
+        
     except Exception as e:
-        raise Exception(f"Error creating PDF: {e}")
+        print(f"PDF Creation Error: {str(e)}")  # Add debug logging
+        raise Exception(f"Error creating PDF: {str(e)}")
 
 def process_pdf(filename, file_path, language_code, tld, speed, task_id, output_format="audio"):
     try:
@@ -204,7 +231,7 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id, output_
         if output_format in ["pdf", "both"]:
             pdf_filename = filename.replace(".pdf", f"_translated_{task_id}.pdf")
             pdf_path = os.path.join("output", pdf_filename)
-            create_translated_pdf('\n'.join(translated_text), pdf_path)
+            create_translated_pdf('\n'.join(translated_text), pdf_path, language_code)
             progress_dict[task_id]['pdf_file'] = pdf_path
 
         # Handle audio if requested
@@ -249,28 +276,25 @@ def process_file():
             return jsonify({"error": "No selected file"}), 400
             
         if file and file.filename.endswith(".pdf"):
-            # Create a unique task ID
-            task_id = str(uuid.uuid4())
-            
-            # Save the uploaded file
-            filename = file.filename
-            file_path = os.path.join('uploads', f"{task_id}_{filename}")
-            file.save(file_path)
-            
-            # Get voice settings
+            # Get voice and output format
             voice = request.form.get("voice", "en")
-            speed = float(request.form.get("speed", "1.0"))
-            
-            # Get language settings from the mapping
-            lang_settings = language_map.get(voice, {"lang": "en", "tld": "com"})
-            
-            # Get output format
             output_format = request.form.get("output_format", "audio")
             
-            # Start processing in a background thread
+            # Enforce audio-only for Asian languages
+            if voice in ['ja', 'zh-CN'] and output_format != 'audio':
+                return jsonify({"error": "Only audio conversion is available for Chinese and Japanese"}), 400
+            
+            # Rest of your existing code...
+            task_id = str(uuid.uuid4())
+            file_path = os.path.join('uploads', f"{task_id}_{file.filename}")
+            file.save(file_path)
+            
+            speed = float(request.form.get("speed", "1.0"))
+            lang_settings = language_map.get(voice, {"lang": "en", "tld": "com"})
+            
             thread = threading.Thread(
                 target=process_pdf,
-                args=(filename, file_path, lang_settings["lang"], 
+                args=(file.filename, file_path, lang_settings["lang"], 
                       lang_settings["tld"], speed, task_id, output_format)
             )
             thread.start()
