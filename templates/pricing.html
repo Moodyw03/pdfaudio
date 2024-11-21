@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocSpeak - Pricing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Include the same root variables and basic styles from index.html */
+        :root {
+            --primary-color: #4a90e2;
+            --primary-hover: #357abd;
+            --text-color: #e1e1e1;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.2);
+            --gradient-start: #1a1f35;
+            --gradient-end: #131b2e;
+            --accent-color: #63b3ed;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2rem;
+            margin: 0 auto;
+        }
+
+        header {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 2rem 0;
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+        }
+
+        .pricing-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .pricing-card.popular {
+            border: 2px solid var(--primary-color);
+            position: relative;
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            padding: 0.5rem 1.5rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 1.5rem 0;
+            color: var(--primary-color);
+        }
+
+        .price span {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+
+        .features {
+            list-style: none;
+            padding: 0;
+            margin: 2rem 0;
+        }
+
+        .features li {
+            margin: 1rem 0;
+            font-size: 1rem;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            header {
+                font-size: 2rem;
+            }
+        }
+
+        footer {
+            padding: 0.8rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.6);
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            position: fixed;
+            bottom: 0;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 5;
+        }
+
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+            margin: 0 0.5rem;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+
+        footer a:hover {
+            color: var(--accent-color);
+        }
+
+        .container {
+            margin-bottom: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>Choose Your Plan</header>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h2>Free</h2>
+                <div class="price">$0 <span>/month</span></div>
+                <ul class="features">
+                    <li>10 pages/month</li>
+                    <li>5MB file limit</li>
+                    <li>2 languages</li>
+                    <li>Basic support</li>
+                </ul>
+                <button class="btn btn-outline">Get Started</button>
+            </div>
+
+            <div class="pricing-card popular">
+                <div class="popular-badge">Most Popular</div>
+                <h2>Basic</h2>
+                <div class="price">$9.99 <span>/month</span></div>
+                <ul class="features">
+                    <li>100 pages/month</li>
+                    <li>20MB file limit</li>
+                    <li>4 languages</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="btn">Subscribe Now</button>
+            </div>
+
+            <div class="pricing-card">
+                <h2>Premium</h2>
+                <div class="price">$19.99 <span>/month</span></div>
+                <ul class="features">
+                    <li>Unlimited pages</li>
+                    <li>100MB file limit</li>
+                    <li>All languages</li>
+                    <li>24/7 Premium support</li>
+                </ul>
+                <button class="btn">Subscribe Now</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>
+            &copy; 2024 Gabriel Pereira Development |
+            <a href="/">Home</a> |
+            <a href="/pricing">Pricing</a> |
+            <a href="#">Terms</a>
+        </p>
+    </footer>
+</body>
+</html> 

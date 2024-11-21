@@ -183,56 +183,15 @@ def process_pdf(filename, file_path, language_code, tld, speed, task_id):
         progress_dict[task_id]['status'] = 'Error'
         progress_dict[task_id]['error'] = str(e)
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def index():
-    if request.method == "POST":
-        try:
-            if "pdf_file" not in request.files:
-                return jsonify({"error": "No file part in the request"}), 400
-            
-            file = request.files["pdf_file"]
-            if file.filename == "":
-                return jsonify({"error": "No selected file"}), 400
-                
-            # Check file size (limit to 100MB)
-            MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB in bytes
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            file.seek(0)
-            
-            if file_size > MAX_FILE_SIZE:
-                return jsonify({"error": "File size exceeds 100MB limit"}), 400
-
-            if file and file.filename.endswith(".pdf"):
-                # Generate a unique ID for this task
-                task_id = str(uuid.uuid4())
-
-                # Save the file
-                if not os.path.exists('uploads'):
-                    os.makedirs('uploads')
-                file_path = os.path.join("uploads", f"{task_id}_{file.filename}")
-                file.save(file_path)
-
-                # Get the selected voice (language)
-                voice = request.form.get("voice", "en")
-                language_info = language_map.get(voice, {"lang": "en", "tld": "com"})
-                language_code = language_info['lang']
-                tld = language_info['tld']
-
-                # Get the selected speed
-                speed = float(request.form.get("speed", 1.0))
-
-                # Start background thread to process the file
-                thread = threading.Thread(target=process_pdf, args=(file.filename, file_path, language_code, tld, speed, task_id))
-                thread.start()
-
-                # Return the task ID to the client
-                return jsonify({"task_id": task_id})
-            else:
-                return jsonify({"error": "Invalid file type. Only PDFs are allowed."}), 400
-        except Exception as e:
-            return jsonify({"error": f"An error occurred: {str(e)}"}), 500
     return render_template("index.html")
+
+@app.route("/", methods=["POST"])
+def process_file():
+    if "pdf_file" not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+    # ... rest of your existing POST handling code ...
 
 @app.route('/progress/<task_id>')
 def progress(task_id):
@@ -253,6 +212,10 @@ def download(task_id):
             return jsonify({'status': progress_dict[task_id]['status']}), 202
     else:
         return jsonify({'error': 'Invalid Task ID'}), 404
+
+@app.route("/pricing")
+def pricing():
+    return render_template("pricing.html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
